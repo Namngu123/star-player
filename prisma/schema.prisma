@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                Int            @id @default(autoincrement())
+  username          String         @unique
+  password          String         @default("")
+  role              String         @default("user")
+  balance           Int            @default(0)
+  discordId         String?        @unique
+  discordUsername   String?
+  discordGlobalName String?
+  discordAvatarUrl  String?
+  haxAuth           String?        @unique
+  haxName           String?
+  elo               Int            @default(1000)
+  lineupElo         Int            @default(1000)
+  cards             Card[]
+  lineup            LineupSlot[]
+  playerCard        PlayerCard?
+  upgradeLogs       UpgradeLog[]
+  haxLoginCodes     HaxLoginCode[]
+  haxDailyWinRewards HaxDailyWinReward[]
+  dailyRewards      DailyReward[]
+  sentTrades        TradeOffer[]    @relation("TradeOfferSender")
+  receivedTrades    TradeOffer[]    @relation("TradeOfferReceiver")
+  notifications     Notification[]
+  battlePassClaims  BattlePassClaim[]
+  fixedPackClaims   FixedPackClaim[]
+}
+
+model Card {
+  id              String       @id @default(cuid())
+  name            String
+  nation          String
+  position        String
+  rating          Int
+  atk             Int
+  def             Int
+  pas             Int
+  imp             Int
+  series          String
+  region          String
+  effect          String?
+  avatarText      String?
+  avatarTextColor String       @default("#FFFFFF")
+  avatarColorMode Int          @default(1)
+  avatarColor1    String       @default("#8b6914")
+  avatarColor2    String       @default("#8b6914")
+  avatarColor3    String       @default("#8b6914")
+  owner           User         @relation(fields: [ownerId], references: [id])
+  ownerId         Int
+  isBought        Boolean      @default(false)
+  isFromShop      Boolean      @default(false)
+  listedPrice     Int?
+  stock           Int          @default(1)
+  floorHint       Int?
+  lineupSlots     LineupSlot[]
+  sentTradeOffers    TradeOffer[] @relation("TradeOfferSenderCard")
+  receivedTradeOffers TradeOffer[] @relation("TradeOfferReceiverCard")
+}
+
+model LineupSlot {
+  id        Int    @id @default(autoincrement())
+  slotIndex Int
+  user      User   @relation(fields: [userId], references: [id])
+  userId    Int
+  card      Card   @relation(fields: [cardId], references: [id])
+  cardId    String
+
+  @@unique([userId, slotIndex])
+}
+
+model PlayerCard {
+  id           String       @id @default(cuid())
+  user         User         @relation(fields: [userId], references: [id])
+  userId       Int          @unique
+  displayName  String
+  avatarUrl    String?
+  position     String       @default("CM")
+  pac          Int          @default(60)
+  sho          Int          @default(60)
+  pas          Int          @default(60)
+  dri          Int          @default(60)
+  def          Int          @default(60)
+  phy          Int          @default(60)
+  overall      Int          @default(60)
+  rankPoints   Int          @default(0)
+  upgradeCount Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  upgradeLogs  UpgradeLog[]
+}
+
+model UpgradeLog {
+  id         String     @id @default(cuid())
+  userId     Int
+  cardId     String
+  cost       Int
+  success    Boolean
+  deltaStats Json
+  createdAt  DateTime   @default(now())
+  card       PlayerCard @relation(fields: [cardId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+}
+
+model HaxLoginCode {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  used      Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model HaxPlayerStat {
+  id       Int    @id @default(autoincrement())
+  auth     String
+  monthKey String
+  goals    Int    @default(0)
+  assists  Int    @default(0)
+  wins     Int    @default(0)
+  games    Int    @default(0)
+  draws    Int    @default(0)
+  losses   Int    @default(0)
+
+  @@unique([auth, monthKey])
+}
+
+model MatchResult {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  blueScore Int
+  duration  Int
+  players   Json
+  redScore  Int
+  roomId    String?
+}
+
+model HaxDailyWinReward {
+  id      Int  @id @default(autoincrement())
+  user    User @relation(fields: [userId], references: [id])
+  userId  Int
+  dateKey String
+  wins    Int  @default(0)
+
+  @@unique([userId, dateKey])
+}
+
+model DailyReward {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  dateKey   String   // YYYY-MM-DD
+  rewardType String  // "card" | "coin"
+  rewardValue Int    // OVR nếu card, số coin nếu coin
+  claimedAt DateTime @default(now())
+
+  @@unique([userId, dateKey])
+}
+
+model BattlePassClaim {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  level     Int
+  claimedAt DateTime @default(now())
+
+  @@unique([userId, level])
+}
+
+model FixedPack {
+  id        Int      @id @default(autoincrement())
+  name      String
+  seasonKey String   @default("season")
+  status    String   @default("draft") // draft | active | archived
+  cost      Int      @default(200)
+  poolSize  Int      @default(15) // số mục tiêu cần nhận để hoàn thành
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items   FixedPackItem[]
+  claims  FixedPackClaim[]
+
+  @@index([status])
+  @@index([seasonKey])
+}
+
+model FixedPackItem {
+  id              Int      @id @default(autoincrement())
+  pack            FixedPack @relation(fields: [packId], references: [id])
+  packId          Int
+  sortOrder       Int      @default(0)
+
+  name            String
+  nation          String
+  position        String
+  rating          Int
+  atk             Int
+  def             Int
+  pas             Int
+  imp             Int
+  series          String
+  region          String
+  effect          String?
+  avatarText      String?
+  avatarTextColor String   @default("#FFFFFF")
+  avatarColorMode Int      @default(1)
+  avatarColor1    String   @default("#8b6914")
+  avatarColor2    String   @default("#8b6914")
+  avatarColor3    String   @default("#8b6914")
+
+  createdAt       DateTime @default(now())
+
+  claims          FixedPackClaim[]
+
+  @@index([packId])
+}
+
+model FixedPackClaim {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  pack      FixedPack @relation(fields: [packId], references: [id])
+  packId    Int
+  item      FixedPackItem @relation(fields: [itemId], references: [id])
+  itemId    Int
+  claimedAt DateTime @default(now())
+
+  @@unique([userId, packId, itemId])
+  @@index([userId, packId])
+}
+
+model TradeOffer {
+  id            String   @id @default(cuid())
+  sender        User     @relation("TradeOfferSender", fields: [senderId], references: [id])
+  senderId      Int
+  receiver      User     @relation("TradeOfferReceiver", fields: [receiverId], references: [id])
+  receiverId    Int
+  senderCardId  String
+  receiverCardId String?
+  senderCard    Card     @relation("TradeOfferSenderCard", fields: [senderCardId], references: [id])
+  receiverCard  Card?    @relation("TradeOfferReceiverCard", fields: [receiverCardId], references: [id])
+  status        String   @default("pending") // pending, accepted, rejected, cancelled
+  senderValue   Float    // Giá trị thẻ của sender
+  receiverValue Float?   // Giá trị thẻ của receiver (null nếu chưa chọn)
+  valueDiff     Float?   // Chênh lệch giá trị (%)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  type      String   // "trade_offer", "trade_accepted", "trade_rejected", "card_sold", "market_purchase"
+  title     String
+  message   String
+  data      Json?    // Additional data (cardId, tradeId, etc.)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+// PackHit model đã được bỏ để tránh phải migrate DB trên môi trường đang có drift.
